@@ -7,13 +7,17 @@ require("dotenv").config();
 const cookieParser = require("cookie-parser");
 
 const app = express();
+const corsOptions = {
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:5174',
+    'genial-theory-434606-u4.web.app',
+  ],
+  credentials: true,
+  optionSuccessStatus: 200,
+}
 // middleware
-app.use(
-  cors({
-    origin: ["http://localhost:5174", "http://localhost:5173"],
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -32,10 +36,10 @@ const client = new MongoClient(uri, {
   },
 });
 
-// const logger = async(req, res, next)=>{
-//   // console.log( req.hostname, req.originalUrl );
-//   next();
-// }
+const logger = async(req, res, next) => {
+  console.log(  req.originalUrl );
+  next();
+}
 
 // const verifyToken = (req, res, next) => {
 //   const token = req.cookies?.token;
@@ -59,31 +63,26 @@ async function run() {
     const servicesCollection = database.collection("services");
     const bookingsCollection = database.collection("bookings");
 
-    // auth releted api
-    app.post("/jwt", async (req, res) => {
+    //auth related api
+    app.post("/jwt", logger , async(req, res)=>{
       const user = req.body;
-      // console.log(user);
+      console.log(user);
       const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1h",
+        expiresIn: "365d",
       });
-      res
-      .cookie("token", token, {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'none'
-        })
-        .send({ success: true });
-    });
 
-    app.post('/logout', async (req, res) => {
-      const user = req.body;
-      console.log(user)
-      res.clearCookie("token", {maxAge: 0}).send({ success: true });;
+      res
+      .cookie('Access_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+      })
+      .send({ success: true })
     })
 
 
     // services collection
-    app.get("/services", async (req, res) => {
+    app.get("/services", logger, async (req, res) => {
       const services = await servicesCollection.find().toArray();
       res.send(services);
     });
@@ -94,7 +93,7 @@ async function run() {
       const result = await servicesCollection.findOne(query);
       res.send(result);
     });
-    app.get("/checkout/:id", async (req, res) => {
+    app.get("/checkout/:id",logger, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const options = {
@@ -112,13 +111,13 @@ async function run() {
 
     // bookings
     app.get("/bookings", async (req, res) => {
-      const user = req.body
-      // console.log("tok tok token", req.cookies?.token);
-      console.log('user',user)
+      // const user = req.body
+      console.log("tok tok token", req.cookies?.Access_token);
+      // console.log('user',user)
       // console.log( req?.query?.email);
-      if(req?.query?.email !== req.user?.email){
-        return res.status(401).send({ message: "Access denied No token provided" })
-      }
+      // if(req?.query?.email !== req.user?.email){
+      //   return res.status(401).send({ message: "Access denied No token provided" })
+      // }
       let query = {};
       if (req.query?.email) {
         query = { email: req?.query.email };
@@ -133,6 +132,20 @@ async function run() {
       const result = await bookingsCollection.insertOne(newBooking);
       res.send(result);
     });
+
+    app.patch("/bookings/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedBooking = req.body;
+      console.log(updatedBooking)
+      const query = { _id: new ObjectId(id) };
+      const filter = {
+        $set: {
+          status : updatedBooking.status
+        }
+      }
+      const result = await bookingsCollection.updateOne(query, filter);
+      res.send(result);
+    })
 
 
     app.delete("/bookings/:id", async (req, res) => {

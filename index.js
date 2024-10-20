@@ -9,8 +9,6 @@ const cookieParser = require("cookie-parser");
 const app = express();
 const corsOptions = {
   origin: [
-    'http://localhost:5173',
-    'http://localhost:5174',
     'genial-theory-434606-u4.web.app',
   ],
   credentials: true,
@@ -114,8 +112,6 @@ async function run() {
 
     // bookings
     app.get("/bookings",verifyToken, async (req, res) => {
-    //  console.log(req?.query?.email)
-    //  console.log(req?.user?.email)
       if(req?.query?.email !== req?.user?.email){
         return res.status(401).send({ message: "Forbidden Access" })
       }
